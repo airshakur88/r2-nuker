@@ -1,0 +1,22 @@
+{
+  "r2": {
+    "accessKeyId": "556d7242881aac7e4f2b262e1f648be8",
+    "secretAccessKey": "b1fae8fb94d168609cd4fa34414594ac78d887f8bc2f76da1506aa86b35b887f",
+    "endpoint": "https://f5bd30da52ab964dace455290ef4183a.r2.cloudflarestorage.com",
+    "region": "auto"
+  },
+  "buckets": [
+    {
+      "name": "hallaxius-development",
+      "bypass": [
+        { "path": "MZ3ESO/", "isPrefix": true },
+        { "path": "88e95cd7-57cc-4cc4-afc6-23699d91797b.png", "isPrefix": false }
+      ]
+    },
+    {
+      "name": "cache"
+    }
+  ],
+  "dryRun": true,
+  "concurrency": 10
+}

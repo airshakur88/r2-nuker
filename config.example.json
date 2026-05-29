@@ -1,0 +1,29 @@
+{
+  "r2": {
+    "accessKeyId": "YOUR_ACCESS_KEY_ID",
+    "secretAccessKey": "YOUR_SECRET_ACCESS_KEY",
+    "endpoint": "https://your-account.r2.cloudflarestorage.com",
+    "region": "auto"
+  },
+  "buckets": [
+    {
+      "name": "my-bucket-1",
+      "bypass": [
+        { "path": "important/", "isPrefix": true },
+        { "path": "config.json", "isPrefix": false }
+      ]
+    },
+    {
+      "name": "my-bucket-2",
+      "bypass": [
+        { "path": "backups/", "isPrefix": true }
+      ]
+    }
+  ],
+  "globalBypass": [
+    { "path": "system/", "isPrefix": true },
+    { "path": ".gitkeep", "isPrefix": false }
+  ],
+  "dryRun": true,
+  "concurrency": 10
+}
