@@ -1,8 +1,8 @@
-# r2-nuker
+# R2 Nuker
 
 Blow up your Cloudflare R2 buckets — safely.
 
-r2-nuker is a CLI tool that wipes all objects and aborts all multipart uploads from your R2 buckets. It runs in dry-run mode by default so you never accidentally nuke something you didn't mean to. You can also set up bypass rules to protect specific files or folders from getting deleted.
+R2 Nuker is a CLI tool that wipes all objects and aborts all multipart uploads from your R2 buckets. It runs in dry-run mode by default so you never accidentally nuke something you didn't mean to. You can also set up bypass rules to protect specific files or folders from getting deleted.
 
 ## Features
 
@@ -22,8 +22,8 @@ r2-nuker is a CLI tool that wipes all objects and aborts all multipart uploads f
 
 ```bash
 # clone the repo
-git clone https://github.com/anomalyco/r2-nuker.git
-cd r2-nuker
+git clone https://github.com/XK244/r2_nuker.git
+cd R2 Nuker
 
 # install dependencies
 bun install

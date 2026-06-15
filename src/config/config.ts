@@ -22,6 +22,8 @@ export const ConfigSchema = z.object({
     endpoint: z.string(),
     region: z.string().default("auto"),
   }),
+  accountId: z.string().optional(),
+  apiToken: z.string().optional(),
   buckets: z.array(BucketConfigSchema).min(1),
   globalBypass: z.array(BypassSchema).default([]),
   dryRun: z.boolean().default(true),

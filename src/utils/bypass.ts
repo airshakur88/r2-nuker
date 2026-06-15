@@ -1,4 +1,4 @@
-import { Bypass, BucketConfig } from "./config.js";
+import type { Bypass, BucketConfig } from "../config/config.js";
 
 export class BypassChecker {
   private globalBypass: Bypass[];

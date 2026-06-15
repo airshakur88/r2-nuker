@@ -1,155 +1,244 @@
 #!/usr/bin/env bun
 
-import { loadConfig } from "./src/config.js";
-import { R2Nuker } from "./src/nuker.js";
+import { loadConfig } from "./src/config/config.js";
+import type { Config } from "./src/config/config.js";
+import { NukeCommand, printNukeResults } from "./src/commands/nuke.js";
+import { UploadCommand } from "./src/commands/upload.js";
+import { DownloadCommand } from "./src/commands/download.js";
+import { MigrateCommand } from "./src/commands/migrate.js";
+import { LsCommand } from "./src/commands/ls.js";
+import { RmCommand } from "./src/commands/rm.js";
+import { BucketsCommand } from "./src/commands/buckets.js";
+import { LifecycleCommand } from "./src/commands/lifecycle.js";
+import { CorsCommand } from "./src/commands/cors.js";
+import { StorageClassCommand } from "./src/commands/storage-class.js";
+import { PresignCommand } from "./src/commands/presign.js";
+import { InfoCommand } from "./src/commands/info.js";
+import { DomainsCommand } from "./src/commands/domains.js";
+import { DevUrlCommand } from "./src/commands/dev-url.js";
+import { TokensCommand } from "./src/commands/tokens.js";
+import { StatsCommand } from "./src/commands/stats.js";
 
-interface CliArgs {
-  config: string;
-  dryRun: boolean;
-  force: boolean;
-  bucket?: string;
-}
+const COMMANDS: Record<string, string> = {
+  nuke:          "Wipe all objects and multipart uploads from buckets",
+  upload:        "Upload files to a bucket",
+  download:      "Download files from a bucket",
+  migrate:       "Migrate objects between buckets",
+  ls:            "List objects in a bucket",
+  rm:            "Delete objects selectively (by prefix, age)",
+  buckets:       "Manage R2 buckets (list, create, delete, info)",
+  lifecycle:     "Manage object lifecycle rules",
+  cors:          "Manage CORS policies",
+  "storage-class": "Transition storage class for objects",
+  presign:       "Generate presigned URLs",
+  info:          "Get detailed info about an object",
+  domains:       "Manage custom domains (requires API token)",
+  "dev-url":     "Manage r2.dev public access (requires API token)",
+  tokens:        "Manage bucket-scoped API tokens (requires API token)",
+  stats:         "View bucket analytics/metrics (requires API token)",
+};
 
-function parseArgs(): CliArgs {
-  const args = process.argv.slice(2);
-  const result: CliArgs = {
-    config: "config.json",
-    dryRun: true,
-    force: false,
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    switch (arg) {
-      case "--config":
-      case "-c":
-        result.config = args[++i];
-        break;
-      case "--dry-run":
-        result.dryRun = true;
-        break;
-      case "--force":
-      case "-f":
-        result.force = true;
-        result.dryRun = false;
-        break;
-      case "--bucket":
-      case "-b":
-        result.bucket = args[++i];
-        break;
-      case "--help":
-      case "-h":
-        printHelp();
-        process.exit(0);
-    }
-  }
-
-  return result;
-}
-
-function printHelp() {
+function printMainHelp(): void {
   console.log(`
-R2 Nuker - Cloudflare R2 Bucket Nuker
+R2 Tools — CLI toolkit for Cloudflare R2
 
-Usage: bun run index.ts [options]
+Usage: r2-tools <command> [options]
 
-Options:
-  --config, -c <path>    Config file path (default: config.json)
-  --dry-run             Run without deleting (default)
-  --force, -f           Actually delete files (default: dry-run)
-  --bucket, -b <name>   Only nuke specific bucket
-  --help, -h            Show this help
+Commands:
+${Object.entries(COMMANDS)
+  .map(([cmd, desc]) => `  ${cmd.padEnd(18)}${desc}`)
+  .join("\n")}
+
+Global options:
+  --config, -c <path>   Config file path (default: config.json)
+  --force, -f           Actually execute destructive operations (default: dry-run)
+  --help, -h            Show help
+
+Use 'r2-tools <command> --help' for more info on a command.
 
 Examples:
-  bun run index.ts                          # Dry run with default config
-  bun run index.ts -c my-config.json        # Use custom config
-  bun run index.ts -f                       # Actually delete
-  bun run index.ts -f -b my-bucket          # Delete only specific bucket
+  r2-tools nuke --force                   # Delete all objects in configured buckets
+  r2-tools upload -b my-bucket -s ./file  # Upload a file
+  r2-tools ls -b my-bucket -l             # List objects with details
+  r2-tools migrate -s old -d new          # Migrate between buckets
 `);
 }
 
-async function main() {
-  const args = parseArgs();
+function parseGlobalArgs(args: string[]): { configPath: string; force: boolean; commandArgs: string[] } {
+  let configPath = "config.json";
+  let force = false;
+  const commandArgs: string[] = [];
 
-  console.log("Loading config from:", args.config);
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i]!;
+    if (arg === "--config" || arg === "-c") {
+      configPath = args[++i] ?? configPath;
+    } else if (arg === "--force" || arg === "-f") {
+      force = true;
+    } else if ((arg === "--help" || arg === "-h") && commandArgs.length === 0) {
+      printMainHelp();
+      process.exit(0);
+    } else {
+      commandArgs.push(arg);
+    }
+    i++;
+  }
 
-  let config;
+  return { configPath, force, commandArgs };
+}
+
+async function main(): Promise<void> {
+  const rawArgs = process.argv.slice(2);
+  const { configPath, force, commandArgs } = parseGlobalArgs(rawArgs);
+
+  if (commandArgs.length === 0) {
+    printMainHelp();
+    process.exit(0);
+  }
+
+  const command = commandArgs[0]!;
+  const cmdArgs = commandArgs.slice(1);
+
+  if (!COMMANDS[command]) {
+    console.error(`Unknown command: '${command}'`);
+    console.log("Run 'r2-tools --help' to see available commands.");
+    process.exit(1);
+  }
+
+  let config: Config;
   try {
-    config = loadConfig(args.config);
+    config = loadConfig(configPath);
   } catch (error) {
-    console.error("Failed to load config:", (error as Error).message);
+    console.error(`Failed to load config from ${configPath}: ${(error as Error).message}`);
     console.log("\nExample config.json:");
     console.log(JSON.stringify({
       r2: {
         accessKeyId: "your-access-key",
         secretAccessKey: "your-secret-key",
         endpoint: "https://your-account.r2.cloudflarestorage.com",
-        region: "auto"
+        region: "auto",
       },
-      buckets: [
-        {
-          name: "my-bucket",
-          bypass: [
-            { path: "important/", isPrefix: true },
-            { path: "config.json", isPrefix: false }
-          ]
-        }
-      ],
-      globalBypass: [
-        { path: "system/", isPrefix: true }
-      ],
+      accountId: "your-cloudflare-account-id",
+      apiToken: "your-cloudflare-api-token",
+      buckets: [{ name: "my-bucket", bypass: [] }],
+      globalBypass: [],
       dryRun: true,
-      concurrency: 10
+      concurrency: 10,
     }, null, 2));
     process.exit(1);
   }
 
-  if (args.bucket) {
-    config.buckets = config.buckets.filter((b) => b.name === args.bucket);
-    if (config.buckets.length === 0) {
-      console.error(`Bucket "${args.bucket}" not found in config`);
-      process.exit(1);
-    }
+  if (force) {
+    config.dryRun = false;
   }
 
-  const nuker = new R2Nuker(config);
-  nuker.setDryRun(args.dryRun);
+  switch (command) {
+    case "nuke": {
+      const nuker = new NukeCommand(config);
+      nuker.setDryRun(config.dryRun);
 
-  const results = await nuker.nukeAll();
-
-  console.log("\n=== RESULTS ===");
-  let totalDeleted = 0;
-  let totalBypassed = 0;
-  let totalAborted = 0;
-  let totalErrors = 0;
-
-  for (const result of results) {
-    console.log(`\nBucket: ${result.bucket}`);
-    console.log(`  Deleted objects: ${result.deletedObjects}`);
-    console.log(`  Bypassed objects: ${result.bypassedObjects}`);
-    console.log(`  Aborted uploads: ${result.abortedUploads}`);
-    console.log(`  Errors: ${result.errors.length}`);
-
-    if (result.errors.length > 0) {
-      for (const error of result.errors) {
-        console.log(`    - ${error}`);
+      let bucket: string | undefined;
+      for (let i = 0; i < cmdArgs.length; i++) {
+        if (cmdArgs[i] === "--bucket" || cmdArgs[i] === "-b") {
+          bucket = cmdArgs[++i];
+        }
       }
+
+      const results = await nuker.run(bucket);
+      printNukeResults(results, config.dryRun);
+      break;
     }
 
-    totalDeleted += result.deletedObjects;
-    totalBypassed += result.bypassedObjects;
-    totalAborted += result.abortedUploads;
-    totalErrors += result.errors.length;
-  }
+    case "upload": {
+      const cmd = new UploadCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
 
-  console.log("\n=== SUMMARY ===");
-  console.log(`Total deleted: ${totalDeleted}`);
-  console.log(`Total bypassed: ${totalBypassed}`);
-  console.log(`Total aborted: ${totalAborted}`);
-  console.log(`Total errors: ${totalErrors}`);
+    case "download": {
+      const cmd = new DownloadCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
 
-  if (args.dryRun) {
-    console.log("\nThis was a DRY RUN. Use -f to actually delete.");
+    case "migrate": {
+      const cmd = new MigrateCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "ls": {
+      const cmd = new LsCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "rm": {
+      const cmd = new RmCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "buckets": {
+      const cmd = new BucketsCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "lifecycle": {
+      const cmd = new LifecycleCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "cors": {
+      const cmd = new CorsCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "storage-class": {
+      const cmd = new StorageClassCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "presign": {
+      const cmd = new PresignCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "info": {
+      const cmd = new InfoCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "domains": {
+      const cmd = new DomainsCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "dev-url": {
+      const cmd = new DevUrlCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "tokens": {
+      const cmd = new TokensCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
+
+    case "stats": {
+      const cmd = new StatsCommand(config);
+      await cmd.run(cmdArgs);
+      break;
+    }
   }
 }
 

@@ -5,6 +5,8 @@
     "endpoint": "https://your-account.r2.cloudflarestorage.com",
     "region": "auto"
   },
+  "accountId": "YOUR_CLOUDFLARE_ACCOUNT_ID",
+  "apiToken": "YOUR_CLOUDFLARE_API_TOKEN",
   "buckets": [
     {
       "name": "my-bucket-1",

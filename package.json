@@ -1,28 +1,26 @@
 {
-  "name": "r2-nuker",
+  "name": "r2-tools",
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "author": "XK244",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.9.1"
   },
   "peerDependencies": {
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
+    "@aws-sdk/s3-request-presigner": "^3.1037.0",
     "@aws-sdk/types": "^3.973.8",
-    "dotenv": "^17.4.2",
     "zod": "^4.3.6"
   },
   "scripts": {
     "start": "bun run index.ts",
-    "start:force": "bun run index.ts --force",
-    "nuke": "bun run index.ts --force",
-    "nuke:dry": "bun run index.ts",
-    "nuke:bucket": "bun run index.ts --force --bucket",
-    "help": "bun run index.ts --help",
-    "example": "bun run index.ts -c config.example.json"
+    "nuke": "bun run index.ts nuke --force",
+    "nuke:dry": "bun run index.ts nuke",
+    "help": "bun run index.ts --help"
   }
 }
